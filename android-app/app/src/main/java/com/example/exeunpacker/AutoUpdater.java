@@ -9,7 +9,6 @@ import java.net.URL;
 public class AutoUpdater {
     private static final String TAG = "AutoUpdater";
     
-    // Change "YOUR_GITHUB_USERNAME" and "YOUR_REPO_NAME" to match your actual GitHub repository settings
     private static final String BOX64_URL = "https://github.com";
     private static final String WINE_URL = "https://github.com";
 
@@ -24,24 +23,23 @@ public class AutoUpdater {
                 connection.setRequestMethod("HEAD");
 
                 if (box64Binary.exists()) {
-                    // Send timestamp. Server responds with 304 Not Modified if no cloud updates exist
                     connection.setIfModifiedSince(box64Binary.lastModified());
                 }
 
                 int responseCode = connection.getResponseCode();
-                Log.d(TAG, "Update check server status response code: " + responseCode);
+                Log.d(TAG, "Update server timestamp evaluation response code: " + responseCode);
 
                 if (responseCode == HttpURLConnection.HTTP_OK) {
-                    Log.d(TAG, "New cloud update found. Initiating dynamic background sync download...");
+                    Log.d(TAG, "Upstream engine mismatch detected. Pulling changes.");
                     callback.onUpdateRequired(BOX64_URL, WINE_URL);
                 } else {
-                    Log.d(TAG, "Binaries are perfectly up to date. Skipping update.");
+                    Log.d(TAG, "Local translation framework matches cloud master release.");
                     callback.onNoUpdateRequired();
                 }
                 connection.disconnect();
             } catch (Exception e) {
-                Log.e(TAG, "Error checking translation engine updates", e);
-                callback.onNoUpdateRequired(); // Gracefully fallback to launching
+                Log.e(TAG, "Error matching system asset timestamps", e);
+                callback.onNoUpdateRequired();
             }
         }).start();
     }
@@ -51,4 +49,3 @@ public class AutoUpdater {
         void onNoUpdateRequired();
     }
 }
-
