@@ -1,0 +1,41 @@
+name: Scheduled Engine Binaries Compiler
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Automatically checks and compiles every Sunday at midnight
+  workflow_dispatch:     # Manual button on GitHub web UI
+
+jobs:
+  build-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Cross-Compilers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake git wget curl tar xz-utils
+
+      - name: Compile Latest Box64 for Android ARM64
+        run: |
+          git clone --depth 1 https://github.com
+          cd box64 && mkdir build && cd build
+          cmake .. -DARM64=1 -DARM_DYNAREC=1 -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          tar -czvf ../../box64-latest.tar.gz box64
+
+      - name: Grab Newest Linux PC Wine Build
+        run: |
+          WINE_URL=$(curl -s https://github.com | grep "browser_download_url" | grep -i "amd64.tar.xz" | head -n 1 | cut -d '"' -f 4)
+          wget -O wine64-latest.tar.xz "$WINE_URL"
+
+      - name: Publish Binaries under Separate Static Tag
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          tag_name: engine-assets
+          name: "Upstream Translation Engine Pipeline Assets"
+          body: "Automated background compilation assets used by the launcher APK applications."
+          draft: false
+          prerelease: false
+          files: |
+            box64-latest.tar.gz
+            wine64-latest.tar.xz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
