@@ -13,13 +13,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Simple UI container logic wrapper
         Button launchButton = new Button(this);
-        launchButton.setText("Launch Windows Application Engine");
+        launchButton.setText("Launch Engine Sandbox Pipeline");
         setContentView(launchButton);
 
         launchButton.setOnClickListener(v -> {
-            Toast.makeText(this, "Checking engine system updates...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Syncing execution engine rules...", Toast.LENGTH_SHORT).show();
             
             AutoUpdater.checkForUpdates(this, new AutoUpdater.UpdateCallback() {
                 @Override
@@ -28,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
                     if (success) {
                         runOnUiThread(() -> runWindowsExecutable());
                     } else {
-                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Engine updates failed.", Toast.LENGTH_LONG).show());
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Engine assets mismatch error.", Toast.LENGTH_LONG).show());
                     }
                 }
 
@@ -44,23 +43,21 @@ public class MainActivity extends AppCompatActivity {
         try {
             String baseDir = getFilesDir().getAbsolutePath();
             
-            // Hardcode your application target file location path here
+            // Customize this path string target rule to point exactly to your app executable file location
             String targetExePath = "/sdcard/Download/YourAppFolder/program.exe";
 
-            // Binds Box64, Wine64, and your target program executable systematically into a single call line
             String execChain = baseDir + "/box64 " + baseDir + "/wine/bin/wine64 " + targetExePath;
 
             ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", "-c", execChain);
             
-            // Passes necessary optimizations straight down into the translation kernel core components
             pb.environment().put("BOX64_DYNAREC", "1");
             pb.environment().put("HOME", baseDir); 
             pb.environment().put("WINEDEBUG", "-all");
 
             pb.start();
-            Toast.makeText(this, "EXE Engine Launched Headlessly!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "EXE Launched Headlessly via Box64 Engine Integration!", Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
-            Toast.makeText(this, "Failed to launch Windows binary executable target.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Launcher pipeline execution failure.", Toast.LENGTH_LONG).show();
             e.printStackTrace();
         }
     }
