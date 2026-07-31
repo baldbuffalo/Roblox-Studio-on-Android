@@ -14,7 +14,7 @@ public class EngineManager {
         File wineArchive = new File(filesDir, "wine.tar.xz");
 
         try {
-            Log.d(TAG, "Downloading translation assets natively...");
+            Log.d(TAG, "Fetching translation assets natively...");
             downloadFile(box64Url, box64Archive);
             downloadFile(wineUrl, wineArchive);
 
@@ -22,21 +22,19 @@ public class EngineManager {
             extractArchive(box64Archive, filesDir);
             extractArchive(wineArchive, filesDir);
 
-            // Clean up compressed archives to instantly free device storage memory
             box64Archive.delete();
             wineArchive.delete();
 
-            // CRITICAL STEP: Give Linux executing permissions so Android OS allows them to function as an engine
             File box64Bin = new File(filesDir, "box64");
-            if (box64Bin.exists()) box64Bin.setExecutable(true, true);
+            if (box64Bin.exists()) box64Bin.setExecutable(true, false);
 
             File wineBin = new File(filesDir, "wine/bin/wine64");
-            if (wineBin.exists()) wineBin.setExecutable(true, true);
+            if (wineBin.exists()) wineBin.setExecutable(true, false);
 
             Log.d(TAG, "Translation deployment engine installation fully successful.");
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "Installation failure pipeline crashed", e);
+            Log.e(TAG, "Asset integration pipeline failed", e);
             return false;
         }
     }
@@ -55,7 +53,6 @@ public class EngineManager {
     }
 
     private static void extractArchive(File archive, File destination) throws IOException, InterruptedException {
-        // Uses Android's native internal Linux shell architecture to extract tar safely and quickly
         String command = "tar -xf " + archive.getAbsolutePath() + " -C " + destination.getAbsolutePath();
         Process process = Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", command});
         process.waitFor();
