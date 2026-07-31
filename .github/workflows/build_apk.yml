@@ -1,0 +1,40 @@
+name: Build Production Android APK Launcher
+on:
+  push:
+    paths:
+      - 'android-app/**' # Only triggers when you modify actual app frontend files
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up JDK Runtime Environment
+        uses: actions/setup-java@v5.6.0
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android Gradle Cache Permissions
+        run: |
+          cd android-app
+          chmod +x gradlew
+
+      - name: Build Production Release APK Package
+        run: |
+          cd android-app
+          ./gradlew assembleRelease
+
+      - name: Publish Android Launcher APK to Releases
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          tag_name: latest-app-release
+          name: "Production App Main Workspace Release"
+          body: "Install this APK file onto your hardware device. Engine tools sync dynamically."
+          draft: false
+          prerelease: false
+          files: android-app/app/build/outputs/apk/release/app-release.unsigned.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
