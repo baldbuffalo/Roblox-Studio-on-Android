@@ -37,7 +37,7 @@ jobs:
       - name: Build Production Debug APK Package
         run: |
           cd android-app
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --warning-mode all
 
       - name: Publish Android Launcher APK to Releases
         uses: softprops/action-gh-release@v1
