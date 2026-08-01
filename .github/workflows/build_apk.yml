@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'android-app/**' # Runs exclusively when app interface changes are checked in
+  workflow_dispatch: {}
 
 permissions:
   contents: write
