@@ -13,10 +13,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake git wget curl tar xz-utils jq
 
-      - name: Set up Python 3.15 (pre-release)
+      - name: Set up Python 3.15.0-beta.4 (pre-release)
         uses: actions/setup-python@v7.0.0
         with:
-          python-version: '3.15.0b4'
+          python-version: '3.15.0-beta.4'
           allow-prereleases: true
 
       - name: Compile Latest Box64 for Android ARM64
