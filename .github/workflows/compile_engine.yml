@@ -11,11 +11,11 @@ jobs:
       - name: Install Architecture Cross-Compilers
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake git wget curl tar xz-utils
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake git wget curl tar xz-utils jq
 
       - name: Compile Latest Box64 for Android ARM64
         run: |
-          git clone --depth 1 https://github.com
+          git clone --depth 1 https://github.com/ptitSeb/box64.git box64
           cd box64 && mkdir build && cd build
           cmake .. -DARM64=1 -DARM_DYNAREC=1 -DCMAKE_BUILD_TYPE=Release
           make -j$(nproc)
@@ -23,8 +23,13 @@ jobs:
 
       - name: Fetch Latest Upstream Linux PC Wine Build
         run: |
-          WINE_URL=$(curl -s https://github.com | grep "browser_download_url" | grep -i "amd64.tar.xz" | head -n 1 | cut -d '"' -f 4)
-          wget -O wine64-latest.tar.xz "$WINE_URL"
+          # Resolve the latest release via the GitHub API instead of scraping HTML,
+          # and pick the plain amd64 build (skip staging/tkg variants).
+          ASSET_URL=$(curl -s https://api.github.com/repos/Kron4ek/Wine-Builds/releases/latest \
+            | jq -r '.assets[] | select(.name | test("^wine-.*-amd64\\.tar\\.xz$")) | select(.name | test("staging|tkg"; "i") | not) | .browser_download_url' \
+            | head -n 1)
+          echo "Resolved Wine asset: $ASSET_URL"
+          wget -O wine64-latest.tar.xz "$ASSET_URL"
 
       - name: Publish Engine Assets Tag Release Bundle
         uses: softprops/action-gh-release@v1

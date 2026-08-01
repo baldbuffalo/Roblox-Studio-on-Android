@@ -9,8 +9,14 @@ import java.net.URL;
 public class AutoUpdater {
     private static final String TAG = "AutoUpdater";
     
-    private static final String BOX64_URL = "https://github.com";
-    private static final String WINE_URL = "https://github.com";
+    // These point at the stable "engine-assets" release tag published by
+    // .github/workflows/compile_engine.yml. The tag name never changes even
+    // though the binaries inside it are refreshed weekly, so these URLs
+    // don't need to be updated when upstream Box64/Wine cut new versions.
+    private static final String BOX64_URL =
+        "https://github.com/baldbuffalo/Roblox-Studio-on-Android/releases/download/engine-assets/box64-latest.tar.gz";
+    private static final String WINE_URL =
+        "https://github.com/baldbuffalo/Roblox-Studio-on-Android/releases/download/engine-assets/wine64-latest.tar.xz";
 
     public static void checkForUpdates(Context context, UpdateCallback callback) {
         new Thread(() -> {
