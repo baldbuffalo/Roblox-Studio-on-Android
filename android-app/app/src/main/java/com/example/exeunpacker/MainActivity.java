@@ -22,24 +22,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(launchButton);
 
         launchButton.setOnClickListener(v -> {
-            Toast.makeText(this, "Syncing execution engine rules...", Toast.LENGTH_SHORT).show();
-            
-            AutoUpdater.checkForUpdates(this, new AutoUpdater.UpdateCallback() {
-                @Override
-                public void onUpdateRequired(String box64Url, String wineUrl) {
-                    boolean success = EngineManager.downloadAndInstall(MainActivity.this, box64Url, wineUrl, deviceNeedsBox64());
-                    if (success) {
-                        runOnUiThread(() -> runWindowsExecutable());
-                    } else {
-                        runOnUiThread(() -> Toast.makeText(MainActivity.this, "Engine assets mismatch error.", Toast.LENGTH_LONG).show());
-                    }
-                }
+            Toast.makeText(this, "Preparing bundled engine assets...", Toast.LENGTH_SHORT).show();
 
-                @Override
-                public void onNoUpdateRequired() {
-                    runOnUiThread(() -> runWindowsExecutable());
+            new Thread(() -> {
+                boolean success = EngineManager.extractBundledEngineIfNeeded(MainActivity.this, deviceNeedsBox64());
+                if (success) {
+                    runOnUiThread(this::runWindowsExecutable);
+                } else {
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Engine asset extraction failed.", Toast.LENGTH_LONG).show());
                 }
-            });
+            }).start();
         });
     }
 
