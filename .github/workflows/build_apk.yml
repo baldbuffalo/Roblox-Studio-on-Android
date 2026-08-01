@@ -4,6 +4,9 @@ on:
     paths:
       - 'android-app/**' # Runs exclusively when app interface changes are checked in
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
