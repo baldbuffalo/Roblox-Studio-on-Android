@@ -13,12 +13,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake git wget curl tar xz-utils jq
 
+      - name: Set up Python 3.15 (pre-release)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.15.0b4'
+          allow-prereleases: true
+
       - name: Compile Latest Box64 for Android ARM64
         run: |
           git clone --depth 1 https://github.com/ptitSeb/box64.git box64
           cd box64 && mkdir build && cd build
-          cmake .. -DARM64=1 -DARM_DYNAREC=1 -DCMAKE_BUILD_TYPE=Release
-          make -j$(nproc)
+          # Box64 must run as a native aarch64 binary on Android devices, but
+          # this runner is x86_64 -- so cross-compile explicitly rather than
+          # building natively (a native x86_64 build chokes on the ARM64
+          # inline asm that ARM_DYNAREC=1 pulls in, e.g. `mrs`/`dc cvau`/`isb`).
+          CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ cmake .. \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+            -DARM64=1 -DARM_DYNAREC=1 \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          make -j"$(nproc)"
+          file box64   # sanity check: must report ARM aarch64, not x86-64
           tar -czvf ../../box64-latest.tar.gz box64
 
       - name: Fetch Latest Upstream Linux PC Wine Build
