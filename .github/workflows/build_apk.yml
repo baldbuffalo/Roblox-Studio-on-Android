@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Repository Source
         uses: actions/checkout@v7.0.1
 
-      - name: Set up JDK 17 Environment
+      - name: Set up JDK 26 Environment
         uses: actions/setup-java@v5.7.0
         with:
           distribution: 'temurin'
