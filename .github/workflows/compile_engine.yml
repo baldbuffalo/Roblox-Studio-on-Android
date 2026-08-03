@@ -50,17 +50,44 @@ jobs:
             | head -n 1)
           echo "Resolved Wine asset: $ASSET_URL"
           wget -O wine64-latest.tar.xz "$ASSET_URL"
+          mkdir wine-extracted
+          tar -xf wine64-latest.tar.xz -C wine-extracted --strip-components=1
 
-      - name: Bundle Engine Assets Into App (assets/engine/)
+      - name: Place Executables Into jniLibs (installer-extracted, so they're actually executable at runtime)
         run: |
+          # Android enforces W^X on files an app writes to its own storage at
+          # runtime (getFilesDir()) since API 29 -- such files can't be exec'd.
+          # jniLibs/<abi>/*.so is extracted by PackageManager itself at
+          # INSTALL time, which is exempt from that restriction. Renaming
+          # these executables to lib*.so and placing them here is how
+          # Winlator and similar projects work around this.
+          mkdir -p android-app/app/src/main/jniLibs/arm64-v8a
+          mkdir -p android-app/app/src/main/jniLibs/x86_64
+
+          cp box64/build/box64 android-app/app/src/main/jniLibs/arm64-v8a/libbox64.so
+          # wine64 itself is an x86_64 binary either way; on arm64-v8a devices
+          # it's invoked through box64, on x86_64 devices directly.
+          cp wine-extracted/bin/wine64 android-app/app/src/main/jniLibs/arm64-v8a/libwine64.so
+          cp wine-extracted/bin/wine64 android-app/app/src/main/jniLibs/x86_64/libwine64.so
+
+      - name: Bundle Wine Support Files Into App (assets/engine/)
+        run: |
+          # Only the executables themselves need the jniLibs treatment.
+          # Wine's lib/share support tree is just data Wine reads at runtime,
+          # not something Android itself needs to exec, so it can still ship
+          # as a plain archive extracted to internal storage on first launch.
+          rm -f wine-extracted/bin/wine64
           mkdir -p android-app/app/src/main/assets/engine
-          cp box64-latest.tar.gz android-app/app/src/main/assets/engine/
-          cp wine64-latest.tar.xz android-app/app/src/main/assets/engine/
+          tar -czf wine-support.tar.gz -C wine-extracted .
+          mv wine-support.tar.gz android-app/app/src/main/assets/engine/
+          # Old artifacts from the previous (pre-jniLibs) bundling approach.
+          rm -f android-app/app/src/main/assets/engine/box64-latest.tar.gz
+          rm -f android-app/app/src/main/assets/engine/wine64-latest.tar.xz
 
       - name: Commit Bundled Engine Assets
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add android-app/app/src/main/assets/engine/
+          git add android-app/app/src/main/jniLibs/ android-app/app/src/main/assets/engine/
           git diff --staged --quiet || git commit -m "Update bundled Box64/Wine engine assets [skip ci]"
           git push

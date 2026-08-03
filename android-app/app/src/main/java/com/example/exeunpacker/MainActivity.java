@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Preparing bundled engine assets...", Toast.LENGTH_SHORT).show();
 
             new Thread(() -> {
-                boolean success = EngineManager.extractBundledEngineIfNeeded(MainActivity.this, deviceNeedsBox64());
+                boolean success = EngineManager.extractWineSupportIfNeeded(MainActivity.this);
                 if (success) {
                     runOnUiThread(this::runWindowsExecutable);
                 } else {
@@ -79,19 +79,32 @@ public class MainActivity extends AppCompatActivity {
     private void runWindowsExecutable() {
         try {
             String baseDir = getFilesDir().getAbsolutePath();
+            String supportDir = baseDir + "/wine-support";
 
             String targetExePath = extractInstallerIfNeeded();
-            String wineBin = baseDir + "/wine/bin/wine64";
+
+            // box64/wine64 exec from nativeLibraryDir (installer-extracted,
+            // actually executable on API 29+) -- NOT from filesDir, which is
+            // subject to Android's W^X restriction on app-written files.
+            String wineBin = EngineManager.getWine64Path(this);
+            String box64Bin = EngineManager.getBox64Path(this);
 
             String execChain = deviceNeedsBox64()
-                ? baseDir + "/box64 " + wineBin + " " + targetExePath
+                ? box64Bin + " " + wineBin + " " + targetExePath
                 : wineBin + " " + targetExePath;
 
             ProcessBuilder pb = new ProcessBuilder("/system/bin/sh", "-c", execChain);
 
             pb.environment().put("BOX64_DYNAREC", "1");
-            pb.environment().put("HOME", baseDir); 
+            pb.environment().put("HOME", baseDir);
             pb.environment().put("WINEDEBUG", "-all");
+            // Wine's own lib/share support tree, extracted from assets as
+            // plain data (not exec'd directly, so no W^X issue there).
+            pb.environment().put("WINEPREFIX", baseDir + "/wineprefix");
+            pb.environment().put("LD_LIBRARY_PATH", supportDir + "/lib:" + supportDir + "/lib64");
+            pb.environment().put("WINESERVER", supportDir + "/bin/wineserver");
+            pb.environment().put("WINELOADER", wineBin);
+            pb.environment().put("WINEDLLPATH", supportDir + "/lib/wine:" + supportDir + "/lib64/wine");
 
             pb.start();
             Toast.makeText(this, "EXE Launched Headlessly via Wine/Box64 Engine Integration!", Toast.LENGTH_SHORT).show();
