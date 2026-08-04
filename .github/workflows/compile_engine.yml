@@ -52,6 +52,10 @@ jobs:
           wget -O wine64-latest.tar.xz "$ASSET_URL"
           mkdir wine-extracted
           tar -xf wine64-latest.tar.xz -C wine-extracted --strip-components=1
+          echo "--- wine-extracted top level ---"
+          ls -la wine-extracted
+          echo "--- searching for wine64 binary ---"
+          find wine-extracted -maxdepth 4 -iname "wine64*"
 
       - name: Place Executables Into jniLibs (installer-extracted, so they're actually executable at runtime)
         run: |
@@ -65,10 +69,22 @@ jobs:
           mkdir -p android-app/app/src/main/jniLibs/x86_64
 
           cp box64/build/box64 android-app/app/src/main/jniLibs/arm64-v8a/libbox64.so
+
+          # Locate wine64 dynamically instead of assuming a fixed path --
+          # Kron4ek's archive layout has varied between releases.
+          WINE64_PATH=$(find wine-extracted -maxdepth 4 -type f -iname "wine64" | head -n 1)
+          if [ -z "$WINE64_PATH" ]; then
+            echo "ERROR: could not locate wine64 binary in extracted archive"
+            find wine-extracted -maxdepth 5
+            exit 1
+          fi
+          echo "Found wine64 at: $WINE64_PATH"
+
           # wine64 itself is an x86_64 binary either way; on arm64-v8a devices
           # it's invoked through box64, on x86_64 devices directly.
-          cp wine-extracted/bin/wine64 android-app/app/src/main/jniLibs/arm64-v8a/libwine64.so
-          cp wine-extracted/bin/wine64 android-app/app/src/main/jniLibs/x86_64/libwine64.so
+          cp "$WINE64_PATH" android-app/app/src/main/jniLibs/arm64-v8a/libwine64.so
+          cp "$WINE64_PATH" android-app/app/src/main/jniLibs/x86_64/libwine64.so
+          echo "$WINE64_PATH" > wine64_path.txt
 
       - name: Bundle Wine Support Files Into App (assets/engine/)
         run: |
@@ -76,7 +92,7 @@ jobs:
           # Wine's lib/share support tree is just data Wine reads at runtime,
           # not something Android itself needs to exec, so it can still ship
           # as a plain archive extracted to internal storage on first launch.
-          rm -f wine-extracted/bin/wine64
+          rm -f "$(cat wine64_path.txt)"
           mkdir -p android-app/app/src/main/assets/engine
           tar -czf wine-support.tar.gz -C wine-extracted .
           mv wine-support.tar.gz android-app/app/src/main/assets/engine/
