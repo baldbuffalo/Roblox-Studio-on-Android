@@ -14,12 +14,14 @@ jobs:
     steps:
       - name: Checkout Repository Source
         uses: actions/checkout@v7.0.1
+        with:
+          lfs: true
 
-      - name: Set up JDK 26 Environment
+      - name: Set up JDK 17 Environment
         uses: actions/setup-java@v5.7.0
         with:
           distribution: 'temurin'
-          java-version: '26.0.2'
+          java-version: '17'
 
       # No gradlew is committed to this repo. Rather than relying on a
       # global `gradle` command, generate the wrapper here so the actual
