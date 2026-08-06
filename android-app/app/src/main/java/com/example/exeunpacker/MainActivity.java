@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
             // box64/wine64 exec from nativeLibraryDir (installer-extracted,
             // actually executable on API 29+) -- NOT from filesDir, which is
             // subject to Android's W^X restriction on app-written files.
-            String wineBin = EngineManager.getWine64Path(this);
+            String wineBin = EngineManager.getWinePath(this);
             String box64Bin = EngineManager.getBox64Path(this);
 
             String execChain = deviceNeedsBox64()
