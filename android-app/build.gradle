@@ -1,8 +1,35 @@
 plugins {
-    id 'com.android.application' version '9.2.1' apply false
+    id 'com.android.application'
 }
 
-tasks.register('clean', Delete) {
-    delete rootProject.layout.buildDirectory
+android {
+    namespace = 'com.example.exeunpacker'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.example.exeunpacker"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
 }
 
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    // Embeddable X11 server (pure Java) so Wine has a display to draw into.
+    // https://github.com/nwrkbiz/android-xserver
+    implementation 'com.github.nwrkbiz.android-xserver:library:master-SNAPSHOT'
+}
