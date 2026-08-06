@@ -7,7 +7,12 @@ import java.io.*;
 
 public class EngineManager {
     private static final String TAG = "EngineManager";
-    private static final String WINE_SUPPORT_ASSET_NAME = "wine-support.tar.gz";
+    // Android's build process automatically decompresses .gz assets during
+    // packaging and strips the extension -- the file inside the built APK
+    // ends up named "wine-support.tar" (plain, uncompressed), not
+    // "wine-support.tar.gz". tar -xf auto-detects format regardless, so
+    // only the name needs to match what's actually bundled.
+    private static final String WINE_SUPPORT_ASSET_NAME = "wine-support.tar";
     private static final String ASSET_SUBDIR = "engine";
 
     /**
@@ -22,8 +27,8 @@ public class EngineManager {
         return context.getApplicationInfo().nativeLibraryDir + "/libbox64.so";
     }
 
-    public static String getWine64Path(Context context) {
-        return context.getApplicationInfo().nativeLibraryDir + "/libwine64.so";
+    public static String getWinePath(Context context) {
+        return context.getApplicationInfo().nativeLibraryDir + "/libwine.so";
     }
 
     /**
