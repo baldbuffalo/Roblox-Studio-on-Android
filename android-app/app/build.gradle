@@ -1,4 +1,4 @@
-9.6.1plugins {
+plugins {
     id 'com.android.application'
 }
 
@@ -21,8 +21,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.toVersion(26)
-        targetCompatibility = JavaVersion.toVersion(26)
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
