@@ -24,11 +24,35 @@ public class EngineManager {
      * runtime (assets extracted to getFilesDir()) can't be exec'd.
      */
     public static String getBox64Path(Context context) {
-        return context.getApplicationInfo().nativeLibraryDir + "/libbox64.so";
+        return resolveNativeLibPath(context, "libbox64.so");
     }
 
     public static String getWinePath(Context context) {
-        return context.getApplicationInfo().nativeLibraryDir + "/libwine.so";
+        return resolveNativeLibPath(context, "libwine.so");
+    }
+
+    /**
+     * On most devices, nativeLibraryDir points directly at the folder
+     * containing the extracted .so files. On some devices/Android versions
+     * (observed with useLegacyPackaging), there's an extra ABI-named
+     * subfolder (e.g. "arm64") nested one level deeper than expected. Check
+     * both locations rather than assuming one.
+     */
+    private static String resolveNativeLibPath(Context context, String libName) {
+        String baseDir = context.getApplicationInfo().nativeLibraryDir;
+        File direct = new File(baseDir, libName);
+        if (direct.exists()) {
+            return direct.getAbsolutePath();
+        }
+        for (String abiFolder : new String[]{"arm64", "arm64-v8a", "x86_64"}) {
+            File nested = new File(baseDir + "/" + abiFolder, libName);
+            if (nested.exists()) {
+                return nested.getAbsolutePath();
+            }
+        }
+        // Nothing found -- return the originally-expected path anyway so
+        // the resulting error message shows where it actually looked.
+        return direct.getAbsolutePath();
     }
 
     /**
