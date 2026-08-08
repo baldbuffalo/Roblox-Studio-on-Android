@@ -5,6 +5,7 @@
 
     <application
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:label="Universal EXE Launcher"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         
@@ -18,4 +19,3 @@
         </activity>
     </application>
 </manifest>
-
