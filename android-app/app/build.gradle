@@ -24,6 +24,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // box64/wine are exec'd as standalone binaries via shell, not dlopen'd
+    // as JNI libraries -- that requires a real file on disk. AGP's default
+    // packaging mmaps native libs directly out of the compressed APK
+    // instead of extracting them, which breaks exec(). Force legacy
+    // (extract-to-disk) packaging so nativeLibraryDir actually contains
+    // real, executable files.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
