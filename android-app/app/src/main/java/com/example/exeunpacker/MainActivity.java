@@ -35,7 +35,9 @@ public class MainActivity extends AppCompatActivity {
         // Embedded X11 server view -- this is what Wine will actually draw
         // into. Without this, Wine has no display and runs invisibly.
         xServer = new XServer(this, xServerPort, null);
-        root.addView(xServer.getScreen());
+        root.addView(xServer.getScreen(), new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT));
 
         Button launchButton = new Button(this);
         launchButton.setText("Launch Engine Sandbox Pipeline");
