@@ -15,14 +15,6 @@ public class EngineManager {
     private static final String WINE_SUPPORT_ASSET_NAME = "wine-support.tar";
     private static final String ASSET_SUBDIR = "engine";
 
-    /**
-     * box64/wine64 themselves are NOT extracted here -- they ship as
-     * jniLibs/<abi>/lib{box64,wine64}.so, which PackageManager extracts to
-     * nativeLibraryDir at install time. That's the only location on modern
-     * Android (API 29+, W^X enforcement) where an app-bundled binary is
-     * actually executable; anything an app writes to its own storage at
-     * runtime (assets extracted to getFilesDir()) can't be exec'd.
-     */
     public static String getBox64Path(Context context) {
         return resolveNativeLibPath(context, "libbox64.so");
     }
@@ -40,26 +32,24 @@ public class EngineManager {
      */
     private static String resolveNativeLibPath(Context context, String libName) {
         String baseDir = context.getApplicationInfo().nativeLibraryDir;
+        Log.d(TAG, "nativeLibraryDir reported as: " + baseDir);
+
         File direct = new File(baseDir, libName);
+        Log.d(TAG, "Trying: " + direct.getAbsolutePath() + " -> exists=" + direct.exists());
         if (direct.exists()) {
             return direct.getAbsolutePath();
         }
         for (String abiFolder : new String[]{"arm64", "arm64-v8a", "x86_64"}) {
             File nested = new File(baseDir + "/" + abiFolder, libName);
+            Log.d(TAG, "Trying: " + nested.getAbsolutePath() + " -> exists=" + nested.exists());
             if (nested.exists()) {
                 return nested.getAbsolutePath();
             }
         }
-        // Nothing found -- return the originally-expected path anyway so
-        // the resulting error message shows where it actually looked.
+        Log.e(TAG, "Could not locate " + libName + " anywhere under " + baseDir);
         return direct.getAbsolutePath();
     }
 
-    /**
-     * Wine's lib/share support tree is just data Wine reads at runtime (not
-     * something Android itself execs), so it's fine as a plain archive
-     * extracted to internal storage on first launch.
-     */
     public static boolean extractWineSupportIfNeeded(Context context) {
         File filesDir = context.getFilesDir();
         File marker = new File(filesDir, "wine-support/lib");
