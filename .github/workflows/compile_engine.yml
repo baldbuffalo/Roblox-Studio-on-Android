@@ -13,104 +13,96 @@ jobs:
         with:
           lfs: true
 
-      - name: Install Architecture Cross-Compilers
+      - name: Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake git wget curl tar xz-utils jq
+          sudo apt-get install -y zstd patchelf jq curl unzip
 
-      - name: Set up Python 3.15.0-beta.4 (pre-release)
-        uses: actions/setup-python@v7.0.0
-        with:
-          python-version: '3.15.0-beta.4'
-          allow-prereleases: true
-
-      - name: Compile Latest Box64 for Android ARM64
+      - name: Resolve Latest Winlator Release APK
         run: |
-          git clone --depth 1 https://github.com/ptitSeb/box64.git box64
-          cd box64 && mkdir build && cd build
-          # Box64 must run as a native aarch64 binary on Android devices, but
-          # this runner is x86_64 -- so cross-compile explicitly rather than
-          # building natively (a native x86_64 build chokes on the ARM64
-          # inline asm that ARM_DYNAREC=1 pulls in, e.g. `mrs`/`dc cvau`/`isb`).
-          CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ cmake .. \
-            -DCMAKE_SYSTEM_NAME=Linux \
-            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-            -DARM64=1 -DARM_DYNAREC=1 \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          make -j"$(nproc)"
-          file box64   # sanity check: must report ARM aarch64, not x86-64
-          tar -czvf ../../box64-latest.tar.gz box64
+          # Winlator (brunodev85/winlator) ships real, working Android-native
+          # (Bionic-compatible) Box64 + Wine + a compiled glibc runtime,
+          # bundled directly inside its release APK. We extract those real
+          # binaries rather than trying to cross-compile our own -- Box64/Wine
+          # built with a generic Linux toolchain produce glibc-linked
+          # binaries that cannot run on Android's Bionic libc at all, since
+          # Android has no glibc and no path like /lib/ld-linux-aarch64.so.1.
+          API_URL="https://api.github.com/repos/brunodev85/winlator/releases/latest"
+          APK_URL=$(curl -s "$API_URL" | jq -r '.assets[] | select(.name | test("\\.apk$")) | .browser_download_url' | head -n 1)
+          echo "Resolved Winlator APK: $APK_URL"
+          curl -sL -o winlator.apk "$APK_URL"
+          unzip -o winlator.apk "assets/rootfs.tzst" "assets/box64/*" -d apk_contents
 
-      - name: Fetch Latest Upstream Linux PC Wine Build
+      - name: Extract glibc Runtime and Wine
         run: |
-          # Resolve the latest release via the GitHub API instead of scraping HTML,
-          # and pick the plain amd64 build (skip staging/tkg variants).
-          ASSET_URL=$(curl -s https://api.github.com/repos/Kron4ek/Wine-Builds/releases/latest \
-            | jq -r '.assets[] | select(.name | test("^wine-.*-amd64\\.tar\\.xz$")) | select(.name | test("staging|tkg"; "i") | not) | .browser_download_url' \
-            | head -n 1)
-          echo "Resolved Wine asset: $ASSET_URL"
-          wget -O wine64-latest.tar.xz "$ASSET_URL"
-          mkdir wine-extracted
-          tar -xf wine64-latest.tar.xz -C wine-extracted --strip-components=1
-          echo "--- full extracted tree ---"
-          find wine-extracted
-          echo "--- searching for any file named wine64 (any depth) ---"
-          find wine-extracted -type f -iname "wine64"
-          echo "--- searching for any executable file with 'wine' in the name ---"
-          find wine-extracted -type f -iname "*wine*" -exec file {} \;
+          mkdir -p rootfs_extracted
+          tar --zstd -xf apk_contents/assets/rootfs.tzst -C rootfs_extracted
+          echo "--- confirming glibc runtime present ---"
+          test -f rootfs_extracted/usr/lib/ld-linux-aarch64.so.1
+          test -f rootfs_extracted/usr/lib/libc.so.6
+          echo "--- confirming wine binary present ---"
+          test -f rootfs_extracted/opt/wine/bin/wine
+
+      - name: Extract Latest Box64 Build
+        run: |
+          # Pick the highest version number available in assets/box64/*.tzst
+          LATEST_BOX64=$(ls apk_contents/assets/box64/box64-*.tzst | sort -V | tail -n 1)
+          echo "Using: $LATEST_BOX64"
+          mkdir box64_extracted
+          tar --zstd -xf "$LATEST_BOX64" -C box64_extracted
+          file box64_extracted/usr/local/bin/box64
+
+      - name: Patch Box64 Interpreter for This App's Package Path
+        run: |
+          # Box64 is a genuine glibc-linked binary; Android has no glibc, so
+          # its ELF interpreter must point at a real glibc runtime WE bundle
+          # and extract at a fixed, known path inside our own app's private
+          # storage (see EngineManager.extractGlibcIfNeeded / GLIBC_ASSET_NAME).
+          # This must exactly match android-app's applicationId.
+          GLIBC_PATH="/data/data/com.example.exeunpacker/files/glibc-lib/ld-linux-aarch64.so.1"
+          patchelf --set-interpreter "$GLIBC_PATH" box64_extracted/usr/local/bin/box64
+          patchelf --set-rpath "/data/data/com.example.exeunpacker/files/glibc-lib" box64_extracted/usr/local/bin/box64
+          echo "--- verifying patch ---"
+          patchelf --print-interpreter box64_extracted/usr/local/bin/box64
 
       - name: Place Executables Into jniLibs (installer-extracted, so they're actually executable at runtime)
         run: |
           # Android enforces W^X on files an app writes to its own storage at
           # runtime (getFilesDir()) since API 29 -- such files can't be exec'd.
           # jniLibs/<abi>/*.so is extracted by PackageManager itself at
-          # INSTALL time, which is exempt from that restriction. Renaming
-          # these executables to lib*.so and placing them here is how
-          # Winlator and similar projects work around this.
+          # INSTALL time, which is exempt from that restriction.
           mkdir -p android-app/app/src/main/jniLibs/arm64-v8a
-          mkdir -p android-app/app/src/main/jniLibs/x86_64
+          cp box64_extracted/usr/local/bin/box64 android-app/app/src/main/jniLibs/arm64-v8a/libbox64.so
+          cp rootfs_extracted/opt/wine/bin/wine android-app/app/src/main/jniLibs/arm64-v8a/libwine.so
+          chmod +x android-app/app/src/main/jniLibs/arm64-v8a/libbox64.so
+          chmod +x android-app/app/src/main/jniLibs/arm64-v8a/libwine.so
 
-          cp box64/build/box64 android-app/app/src/main/jniLibs/arm64-v8a/libbox64.so
-
-          # Locate the wine binary dynamically. Note: this Kron4ek build
-          # ships without a separate `wine64` symlink -- the single `wine`
-          # binary already handles both 32/64-bit via WoW64.
-          WINE_PATH=$(find wine-extracted -maxdepth 2 -type f -iname "wine" | head -n 1)
-          if [ -z "$WINE_PATH" ]; then
-            echo "ERROR: could not locate wine binary in extracted archive"
-            find wine-extracted
-            exit 1
-          fi
-          echo "Found wine at: $WINE_PATH"
-
-          # wine itself is an x86_64 binary either way; on arm64-v8a devices
-          # it's invoked through box64, on x86_64 devices directly.
-          cp "$WINE_PATH" android-app/app/src/main/jniLibs/arm64-v8a/libwine.so
-          cp "$WINE_PATH" android-app/app/src/main/jniLibs/x86_64/libwine.so
-          echo "$WINE_PATH" > wine_path.txt
-
-      - name: Bundle Wine Support Files Into App (assets/engine/)
+      - name: Bundle glibc Runtime and Wine Support Files Into App (assets/engine/)
         run: |
-          # Only the executables themselves need the jniLibs treatment.
-          # Wine's lib/share support tree is just data Wine reads at runtime,
-          # not something Android itself needs to exec, so it can still ship
-          # as a plain archive extracted to internal storage on first launch.
-          rm -f "$(cat wine_path.txt)"
           mkdir -p android-app/app/src/main/assets/engine
-          tar -czf wine-support.tar.gz -C wine-extracted .
+
+          # glibc runtime box64 needs to start at all (see patch step above).
+          tar -czf glibc-lib.tar.gz -C rootfs_extracted/usr/lib .
+          mv glibc-lib.tar.gz android-app/app/src/main/assets/engine/
+
+          # Wine's lib/share/bin support tree -- must come from the SAME
+          # Wine build as the binary placed in jniLibs above, since mixing
+          # different Wine builds/versions breaks in confusing ways.
+          mkdir -p wine_support/bin
+          cp -r rootfs_extracted/opt/wine/lib wine_support/
+          cp -r rootfs_extracted/opt/wine/share wine_support/
+          cp rootfs_extracted/opt/wine/bin/* wine_support/bin/
+          rm -f wine_support/bin/wine  # already placed separately as jniLibs/libwine.so
+          tar -czf wine-support.tar.gz -C wine_support .
           mv wine-support.tar.gz android-app/app/src/main/assets/engine/
-          # Old artifacts from the previous (pre-jniLibs) bundling approach.
-          rm -f android-app/app/src/main/assets/engine/box64-latest.tar.gz
-          rm -f android-app/app/src/main/assets/engine/wine64-latest.tar.xz
 
       - name: Commit Bundled Engine Assets
         run: |
           sudo apt-get install -y git-lfs
           git lfs install
 
-          # GitHub hard-rejects files over 100MB via plain git; Wine's
-          # support tarball and the box64 binary both exceed or approach
-          # that, so they need to go through Git LFS instead.
+          # GitHub hard-rejects files over 100MB via plain git; several of
+          # these assets exceed or approach that, so they go through Git LFS.
           if [ ! -f .gitattributes ] || ! grep -q "filter=lfs" .gitattributes; then
             echo "android-app/app/src/main/jniLibs/**/*.so filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
             echo "android-app/app/src/main/assets/engine/*.tar.gz filter=lfs diff=lfs merge=lfs -text" >> .gitattributes
@@ -120,5 +112,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .gitattributes android-app/app/src/main/jniLibs/ android-app/app/src/main/assets/engine/
-          git diff --staged --quiet || git commit -m "Update bundled Box64/Wine engine assets [skip ci]"
+          git diff --staged --quiet || git commit -m "Update bundled engine binaries from latest Winlator release [skip ci]"
           git push
