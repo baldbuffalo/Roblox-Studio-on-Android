@@ -162,10 +162,10 @@ public class MainActivity extends AppCompatActivity {
             // (Android has no glibc at all) -- its ELF interpreter is
             // patched to a fixed path, but library resolution beyond that
             // still honors LD_LIBRARY_PATH.
-            pb.environment().put("LD_LIBRARY_PATH", glibcDir + ":" + supportDir + "/lib");
+            pb.environment().put("LD_LIBRARY_PATH", glibcDir + ":" + supportDir + "/lib:" + supportDir + "/lib/wine/x86_64-unix");
             pb.environment().put("WINESERVER", supportDir + "/bin/wineserver");
             pb.environment().put("WINELOADER", wineBin);
-            pb.environment().put("WINEDLLPATH", supportDir + "/lib/wine");
+            pb.environment().put("WINEDLLPATH", supportDir + "/lib/wine/x86_64-unix");
 
             Process process = pb.start();
 
